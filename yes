@@ -231,13 +231,29 @@ local CONFIG_LIST_H     = 200
 local CONFIG_INPUT_H    = 32
 local CONFIG_BTN_ROW_H  = 28
 
--- Shared registry tables (used by config + theme systems)
+-- ============================================================
+-- THEME TRACKING
+-- ============================================================
 local themeMap = {
-    Main = {}, Inline = {}, Accent = {}, Text = {}, TextDim = {}, Outline = {},
+    Main    = {},
+    Inline  = {},
+    Accent  = {},
+    Text    = {},
+    TextDim = {},
+    Outline = {},
 }
 local function track(role, obj, prop)
     if not themeMap[role] then themeMap[role] = {} end
     table.insert(themeMap[role], { obj = obj, prop = prop })
+end
+local function untrack(obj)
+    for _, list in pairs(themeMap) do
+        for i = #list, 1, -1 do
+            if list[i].obj == obj then
+                table.remove(list, i)
+            end
+        end
+    end
 end
 
 local configRegistry = {}
@@ -256,7 +272,9 @@ local function applyRole(role, c)
     end
 end
 
--- Global fade system — collects all fadable descendants of Home
+-- ============================================================
+-- FADE SYSTEM
+-- ============================================================
 local fadeCache = nil
 local fadeConn = nil
 local fadeState = 1
@@ -462,13 +480,13 @@ local function deleteConfigFile(name)
 end
 
 -- ============================================================
--- ELEMENT CREATORS (all take a section "body" frame)
+-- ELEMENT CREATORS
 -- ============================================================
 local function makeToggle(body, data)
-    local name = data.Name or data.name or "Toggle"
-    local default = data.Default or data.default or false
-    local cb = data.Callback or data.callback or function() end
-    local flag = data.Flag or data.flag
+    local name = data.Name or "Toggle"
+    local default = data.Default or false
+    local cb = data.Callback or function() end
+    local flag = data.Flag
     local state = default
     local row = Instance.new("TextButton")
     row.Parent = body
@@ -503,6 +521,8 @@ local function makeToggle(body, data)
     track("Text", lbl, "TextColor3")
     local function set(v, silent)
         state = v
+        untrack(box)
+        track(state and "Accent" or "Main", box, "BackgroundColor3")
         tween(box, { BackgroundColor3 = state and Palette.Accent or Palette.Main }, 0.12)
         if not silent and cb then cb(state) end
     end
@@ -1354,28 +1374,18 @@ local function makeLabel(body, data)
 end
 
 -- ============================================================
--- SECTION / TAB / WINDOW WRAPPERS
+-- SECTION / TAB / WINDOW
 -- ============================================================
 local Section = {}
 Section.__index = Section
 
-function Section:_makeElement(name, data, kind)
-    local body = self.Body
-    if kind == "toggle" then return makeToggle(body, data) end
-    if kind == "slider" then return makeSlider(body, data) end
-    if kind == "keybind" then return makeKeybind(body, data) end
-    if kind == "dropdown" then return makeDropdown(body, data) end
-    if kind == "colorpicker" then return makeColorpicker(body, data) end
-    if kind == "label" then return makeLabel(body, data) end
-end
-
-function Section:Toggle(data) return self:_makeElement("Toggle", data, "toggle") end
-function Section:Slider(data) return self:_makeElement("Slider", data, "slider") end
-function Section:Keybind(data) return self:_makeElement("Keybind", data, "keybind") end
-function Section:Dropdown(data) return self:_makeElement("Dropdown", data, "dropdown") end
-function Section:Colorpicker(data) return self:_makeElement("Color", data, "colorpicker") end
-function Section:ColorPicker(data) return self:_makeElement("Color", data, "colorpicker") end
-function Section:Label(data) return self:_makeElement("Label", data, "label") end
+function Section:Toggle(data) return makeToggle(self.Body, data) end
+function Section:Slider(data) return makeSlider(self.Body, data) end
+function Section:Keybind(data) return makeKeybind(self.Body, data) end
+function Section:Dropdown(data) return makeDropdown(self.Body, data) end
+function Section:Colorpicker(data) return makeColorpicker(self.Body, data) end
+function Section:ColorPicker(data) return makeColorpicker(self.Body, data) end
+function Section:Label(data) return makeLabel(self.Body, data) end
 
 local Tab = {}
 Tab.__index = Tab
@@ -1476,6 +1486,7 @@ function Window:Tab(data)
     tab.ZIndex = 20
     tab.Active = true
     tab.Interactable = true
+    track(index == 1 and "Text" or "TextDim", tab, "TextColor3")
     table.insert(self.TabButtons, tab)
     local page = Instance.new("ScrollingFrame")
     page.Parent = self.Content
@@ -1491,11 +1502,14 @@ function Window:Tab(data)
     page.ScrollBarImageColor3 = Palette.Accent
     page.ScrollBarImageTransparency = 0.3
     page.Active = true
+    track("Accent", page, "ScrollBarImageColor3")
     table.insert(self.Pages, page)
     tab.MouseButton1Click:Connect(function()
         for j = 1, #self.Tabs do
             local on = (j == index)
-            tween(self.TabButtons[j], { TextColor3 = on and Palette.Text or Palette.TextDim }, 0.12)
+            untrack(self.TabButtons[j])
+            track(on and "Text" or "TextDim", self.TabButtons[j], "TextColor3")
+            self.TabButtons[j].TextColor3 = on and Palette.Text or Palette.TextDim
             self.Pages[j].Visible = on
         end
     end)
@@ -1529,8 +1543,11 @@ function Library:Window(data)
     Home.ZIndex = 1
     Home.ClipsDescendants = false
     Home.Visible = true
+    track("Main", Home, "BackgroundColor3")
 
     local homeOuter = stroke(Home, Palette.Outline, 1)
+    track("Outline", homeOuter, "Color")
+
     local homeInnerContainer = Instance.new("Frame")
     homeInnerContainer.Parent = Home
     homeInnerContainer.BackgroundTransparency = 1
@@ -1541,6 +1558,7 @@ function Library:Window(data)
     homeInnerContainer.Active = false
     homeInnerContainer.Interactable = false
     local homeInner = stroke(homeInnerContainer, Palette.Inline, 1)
+    track("Inline", homeInner, "Color")
 
     fadeHome = Home
     local menuOpen = true
@@ -1567,6 +1585,7 @@ function Library:Window(data)
     Title.Position = UDim2.new(0, 1, 0, 1)
     Title.Size = UDim2.new(1, -2, 0, BAR_H)
     Title.ZIndex = 3
+    track("Main", Title, "BackgroundColor3")
 
     local TitleLine = Instance.new("Frame")
     TitleLine.Name = "TitleLine"
@@ -1578,6 +1597,7 @@ function Library:Window(data)
     TitleLine.ZIndex = 8
     TitleLine.Active = false
     TitleLine.Interactable = false
+    track("Inline", TitleLine, "BackgroundColor3")
 
     local howlLbl = Instance.new("TextLabel")
     howlLbl.Parent = Title
@@ -1595,6 +1615,7 @@ function Library:Window(data)
     howlLbl.ZIndex = 6
     howlLbl.Active = false
     howlLbl.Interactable = false
+    track("Text", howlLbl, "TextColor3")
 
     local ccLbl = Instance.new("TextLabel")
     ccLbl.Parent = Title
