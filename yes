@@ -226,21 +226,11 @@ local PANEL_BG_TRANSPARENCY   = 0.35
 local SECTION_BG_TRANSPARENCY = 0
 local INSET_BG_TRANSPARENCY   = 0
 
-local CONFIG_GAP        = 8
-local CONFIG_LIST_H     = 200
-local CONFIG_INPUT_H    = 32
-local CONFIG_BTN_ROW_H  = 28
-
 -- ============================================================
 -- THEME TRACKING
 -- ============================================================
 local themeMap = {
-    Main    = {},
-    Inline  = {},
-    Accent  = {},
-    Text    = {},
-    TextDim = {},
-    Outline = {},
+    Main = {}, Inline = {}, Accent = {}, Text = {}, TextDim = {}, Outline = {},
 }
 local function track(role, obj, prop)
     if not themeMap[role] then themeMap[role] = {} end
@@ -1502,6 +1492,7 @@ function Window:Tab(data)
     page.ScrollBarImageColor3 = Palette.Accent
     page.ScrollBarImageTransparency = 0.3
     page.Active = true
+    page.ClipsDescendants = true
     track("Accent", page, "ScrollBarImageColor3")
     table.insert(self.Pages, page)
     tab.MouseButton1Click:Connect(function()
@@ -1668,6 +1659,7 @@ function Library:Window(data)
     Content.Position = UDim2.new(0, 1, 0, contentY)
     Content.Size = UDim2.new(1, -2, 0, contentH)
     Content.ZIndex = 2
+    Content.ClipsDescendants = true
 
     do
         local dragging = false
