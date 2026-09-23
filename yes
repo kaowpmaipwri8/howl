@@ -262,18 +262,10 @@ local function applyRole(role, c)
     end
 end
 
-local function setHomeVisible(v)
-    menuOpen = v
-    if v then
-        Home.Visible = true
-        collectFadeTargets()   -- rebuild list, but preserve existing bases
-        forceHideAll()
-        fadeState = 0
-        fadeTo(1, 0.32, Enum.EasingStyle.Quart, false)
-    else
-        fadeTo(0, 0.32, Enum.EasingStyle.Quart, true)
-    end
-end
+-- ============================================================
+-- MENU VISIBILITY (instant toggle — no fade)
+-- ============================================================
+local fadeHome = nil
 
 -- ============================================================
 -- CONFIG SYSTEM
@@ -660,7 +652,6 @@ local function makeDropdown(body, data)
     else
         value = items[1]
     end
-    local opened = false
     local lastToggle = 0
     local optionButtons = {}
     local FIELD_H_ACTUAL = 28
@@ -740,7 +731,6 @@ local function makeDropdown(body, data)
     chevron.Interactable = false
     local list = Instance.new("Frame")
     list.Parent = fadeHome
-    list:SetAttribute("NoFade", true)
     list.BackgroundColor3 = Palette.Main
     list.BackgroundTransparency = 0
     list.BorderSizePixel = 0
@@ -779,7 +769,14 @@ local function makeDropdown(body, data)
     listLayout.Parent = optionsHolder
     local function paintOptions()
         for optName, d in pairs(optionButtons) do
-            d.label.TextColor3 = (optName == value) and Palette.Accent or Palette.Text
+            untrack(d.label)
+            if optName == value then
+                d.label.TextColor3 = Palette.Accent
+                track("Accent", d.label, "TextColor3")
+            else
+                d.label.TextColor3 = Palette.Text
+                track("Text", d.label, "TextColor3")
+            end
         end
     end
     local function selectOption(optName, silent)
@@ -828,8 +825,6 @@ local function makeDropdown(body, data)
         end)
         btn.MouseButton1Click:Connect(function()
             selectOption(optName)
-            -- Cool-down so the field's own click handler (which fires after
-            -- this one on the same input frame) doesn't immediately re-open.
             lastToggle = os.clock() + 0.2
             dd:setOpen(false)
         end)
@@ -848,74 +843,25 @@ local function makeDropdown(body, data)
         list.Position = UDim2.fromOffset(lx, ly)
         list.Size = UDim2.new(0, fSize.X, 0, listH)
     end
-    local listFadeConn = nil
-    local listFadeState = 0
-    local function applyListFade(a)
-        list.BackgroundTransparency = 1 - a
-        for _, c in ipairs(list:GetDescendants()) do
-            if c:IsA("TextLabel") then
-                c.TextTransparency = 1 - a
-            elseif c:IsA("Frame") then
-                if c.BackgroundColor3 == Palette.Outline
-                   or c.BackgroundColor3 == Palette.Inline then
-                    c.BackgroundTransparency = 1 - a
-                end
-            end
-        end
-    end
-    local function forceHideList()
-        list.BackgroundTransparency = 1
-        for _, c in ipairs(list:GetDescendants()) do
-            if c:IsA("TextLabel") then
-                c.TextTransparency = 1
-            elseif c:IsA("Frame") then
-                if c.BackgroundColor3 == Palette.Outline
-                   or c.BackgroundColor3 == Palette.Inline then
-                    c.BackgroundTransparency = 1
-                end
-            end
-        end
-    end
-    local function fadeList(target, duration, hideAfter)
-        if listFadeConn then listFadeConn:Disconnect() listFadeConn = nil end
-        local startA = listFadeState
-        local t0 = os.clock()
-        listFadeConn = RunService.RenderStepped:Connect(function()
-            local a = math.clamp((os.clock() - t0) / duration, 0, 1)
-            a = 1 - (1 - a) ^ 3
-            listFadeState = startA + (target - startA) * a
-            applyListFade(listFadeState)
-            if a >= 1 then
-                listFadeState = target
-                if target <= 0 then forceHideList() else applyListFade(target) end
-                listFadeConn:Disconnect()
-                listFadeConn = nil
-                if hideAfter and target <= 0 then list.Visible = false end
-            end
-        end)
-    end
     function dd:setOpen(o)
         if self.opened == o then return end
         if o then
             positionList()
-            forceHideList()
-            listFadeState = 0
             list.Visible = true
-            fadeList(1, 0.2, false)
             if fieldBorder.oB then fieldBorder.oB.Visible = false end
             if fieldBorder.iB then fieldBorder.iB.Visible = false end
             tween(chevron, { Rotation = 180 }, 0.15)
         else
-            tween(chevron, { Rotation = 0 }, 0.15)
-            fadeList(0, 0.16, true)
+            list.Visible = false
             if fieldBorder.oB then fieldBorder.oB.Visible = true end
             if fieldBorder.iB then fieldBorder.iB.Visible = true end
+            tween(chevron, { Rotation = 0 }, 0.15)
         end
         self.opened = o
     end
     field.MouseButton1Click:Connect(function()
         local now = os.clock()
-        if now < lastToggle then return end  -- still in cooldown after a selection
+        if now < lastToggle then return end
         lastToggle = now
         dd:setOpen(not dd.opened)
     end)
@@ -973,7 +919,6 @@ local function makeColorpicker(body, data)
     local PANEL_H = SV_PAD + svSize + GAP_V + HUE_H + HEX_GAP + HEX_H + SV_PAD
     local popup = Instance.new("Frame")
     popup.Parent = fadeHome
-    popup:SetAttribute("NoFade", true)
     popup.BackgroundColor3 = Palette.Main
     popup.BackgroundTransparency = 0
     popup.BorderSizePixel = 0
@@ -1602,8 +1547,7 @@ function Window:Tab(data)
             if not w or w <= 0 then w = TAB_W end
             cursor = cursor - w
             t.Position = UDim2.new(1, cursor, 0.5, 0)
-            cursor = cursor - TAB_GAP
-        end
+            cursor = cursor - TAB_GAP        end
     end
     task.defer(repositionTabs)
     task.delay(0.15, repositionTabs)
@@ -1691,16 +1635,14 @@ function Library:Window(data)
 
     local function setHomeVisible(v)
         menuOpen = v
-        if v then
-            Home.Visible = true
-            -- Rebuild fade cache so newly-created elements are included.
-            collectFadeTargets()
-            snapshotBases()
-            forceHideAll()
-            fadeState = 0
-            fadeTo(1, 0.32, Enum.EasingStyle.Quart, false)
-        else
-            fadeTo(0, 0.32, Enum.EasingStyle.Quart, true)
+        Home.Visible = v
+        -- Close any open dropdowns / colorpickers when hiding
+        if not v then
+            for _, d in ipairs(Home:GetDescendants()) do
+                if d:IsA("TextButton") and d:GetAttribute("IsColorpickerSwatch") then
+                    local ok = pcall(function() d:SetAttribute("ForceClose", true) end)
+                end
+            end
         end
     end
     local function toggleMenu()
@@ -2022,7 +1964,6 @@ function Library:Window(data)
         -- ========================================================
         -- THEME SECTION
         -- ========================================================
-        -- Preset themes row
         local presetRow = Instance.new("Frame")
         presetRow.Parent = ThemeSection.Body
         presetRow.BackgroundTransparency = 1
@@ -2037,8 +1978,6 @@ function Library:Window(data)
         presetLbl.ZIndex = 7
         track("Text", presetLbl, "TextColor3")
 
-        -- We build the preset dropdown manually to control its position
-        -- (label left, dropdown right)
         local presetDropdown = ThemeSection:Dropdown({
             Name = "",
             Items = { "Default", "Cherry", "Galaxy", "Red", "Sakura" },
@@ -2083,7 +2022,6 @@ function Library:Window(data)
             end,
         })
 
-        -- Move the dropdown's row into presetRow and shrink it
         if presetDropdown and presetDropdown.Row then
             local r = presetDropdown.Row
             local field = r:FindFirstChildOfClass("TextButton")
@@ -2115,12 +2053,6 @@ function Library:Window(data)
             })
         end
     end
-
-    -- Initialize fade cache AFTER all UI is built.
-    collectFadeTargets()
-    snapshotBases()
-    fadeState = 1
-    applyFade(1)
 
     return self
 end
