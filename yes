@@ -209,7 +209,7 @@ local ROW_H     = 20
 local SLIDER_H  = ROW_H + 10
 local BAR_H     = 30
 local TAB_W     = 62
-local TAB_GAP   = 14
+local TAB_GAP   = 10
 local TAB_RIGHT = 10
 local HEADER_H  = 26
 local FIELD_W   = 52
@@ -1513,13 +1513,11 @@ function Window:Tab(data)
     local myIndex = #self.Tabs + 1
 
     local tab = Instance.new("TextButton")
-    tab.Parent = self.Title
+    tab.Parent = self.TabsContainer
     tab.BackgroundTransparency = 1
     tab.BorderSizePixel = 0
-    tab.AnchorPoint = Vector2.new(1, 0.5)
-    tab.AutomaticSize = Enum.AutomaticSize.X
     tab.Size = UDim2.new(0, 0, 0, BAR_H - 8)
-    tab.Position = UDim2.new(1, 0, 0.5, 0)
+    tab.AutomaticSize = Enum.AutomaticSize.X
     tab.FontFace = Fonts.Gotham
     tab.Text = name
     tab.TextColor3 = (myIndex == 1) and Palette.Text or Palette.TextDim
@@ -1530,6 +1528,7 @@ function Window:Tab(data)
     tab.ZIndex = 20
     tab.Active = true
     tab.Interactable = true
+    tab.LayoutOrder = myIndex
 
     local pad = Instance.new("UIPadding")
     pad.PaddingLeft = UDim.new(0, 6)
@@ -1538,20 +1537,6 @@ function Window:Tab(data)
 
     track((myIndex == 1) and "Text" or "TextDim", tab, "TextColor3")
     table.insert(self.TabButtons, tab)
-
-    local function repositionTabs()
-        local cursor = -TAB_RIGHT
-        for i = #self.TabButtons, 1, -1 do
-            local t = self.TabButtons[i]
-            local w = t.AbsoluteSize.X
-            if not w or w <= 0 then w = TAB_W end
-            cursor = cursor - w
-            t.Position = UDim2.new(1, cursor, 0.5, 0)
-            cursor = cursor - TAB_GAP        end
-    end
-    task.defer(repositionTabs)
-    task.delay(0.15, repositionTabs)
-    tab:GetPropertyChangedSignal("AbsoluteSize"):Connect(repositionTabs)
 
     local page = Instance.new("ScrollingFrame")
     page.Parent = self.Content
@@ -1636,14 +1621,6 @@ function Library:Window(data)
     local function setHomeVisible(v)
         menuOpen = v
         Home.Visible = v
-        -- Close any open dropdowns / colorpickers when hiding
-        if not v then
-            for _, d in ipairs(Home:GetDescendants()) do
-                if d:IsA("TextButton") and d:GetAttribute("IsColorpickerSwatch") then
-                    local ok = pcall(function() d:SetAttribute("ForceClose", true) end)
-                end
-            end
-        end
     end
     local function toggleMenu()
         setHomeVisible(not menuOpen)
@@ -1670,6 +1647,28 @@ function Library:Window(data)
     TitleLine.Active = false
     TitleLine.Interactable = false
     track("Inline", TitleLine, "BackgroundColor3")
+
+    -- Container for tab buttons, right-aligned via UIListLayout
+    local TabsContainer = Instance.new("Frame")
+    TabsContainer.Name = "TabsContainer"
+    TabsContainer.Parent = Title
+    TabsContainer.BackgroundTransparency = 1
+    TabsContainer.BorderSizePixel = 0
+    TabsContainer.AnchorPoint = Vector2.new(1, 0.5)
+    TabsContainer.Position = UDim2.new(1, -TAB_RIGHT, 0.5, 0)
+    TabsContainer.Size = UDim2.new(0, 0, 1, 0)
+    TabsContainer.AutomaticSize = Enum.AutomaticSize.X
+    TabsContainer.ZIndex = 19
+    TabsContainer.Active = false
+    TabsContainer.Interactable = false
+
+    local tabsLayout = Instance.new("UIListLayout")
+    tabsLayout.FillDirection = Enum.FillDirection.Horizontal
+    tabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    tabsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+    tabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    tabsLayout.Padding = UDim.new(0, TAB_GAP)
+    tabsLayout.Parent = TabsContainer
 
     local howlLbl = Instance.new("TextLabel")
     howlLbl.Parent = Title
@@ -1778,6 +1777,7 @@ function Library:Window(data)
         Gui = Menu,
         Home = Home,
         Title = Title,
+        TabsContainer = TabsContainer,
         Content = Content,
         Tabs = {},
         Pages = {},
