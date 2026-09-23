@@ -1363,6 +1363,203 @@ local function makeLabel(body, data)
     }
 end
 
+local function makeButton(body, data)
+    local name = data.Name or "Button"
+    local cb = data.Callback or function() end
+    local btn = Instance.new("TextButton")
+    btn.Parent = body
+    btn.Size = UDim2.new(1, 0, 0, 24)
+    btn.BackgroundColor3 = Palette.Main
+    btn.BackgroundTransparency = 0
+    btn.BorderSizePixel = 0
+    btn.Text = ""
+    btn.AutoButtonColor = false
+    btn.ZIndex = 6
+    btn.LayoutOrder = #body:GetChildren()
+    btn.Active = true
+    btn.Interactable = true
+    doubleStroke(btn)
+    track("Main", btn, "BackgroundColor3")
+    local txt = label(btn, name, 13, Palette.Text, Enum.TextXAlignment.Center)
+    txt.Size = UDim2.new(1, 0, 1, 0)
+    txt.ZIndex = 8
+    track("Text", txt, "TextColor3")
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Palette.Inline
+    end)
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Palette.Main
+    end)
+    btn.MouseButton1Click:Connect(function()
+        cb()
+    end)
+    return {}
+end
+
+local function makeTextbox(body, data)
+    local name = data.Name or ""
+    local default = data.Default or ""
+    local placeholder = data.Placeholder or ""
+    local cb = data.Callback or function() end
+    local flag = data.Flag
+
+    local holder = Instance.new("Frame")
+    holder.Parent = body
+    holder.BackgroundTransparency = 1
+    holder.BorderSizePixel = 0
+    holder.Size = UDim2.new(1, 0, 0, (name ~= "" and 40) or 28)
+    holder.ZIndex = 6
+    holder.LayoutOrder = #body:GetChildren()
+
+    if name ~= "" then
+        local lbl = label(holder, name, 13, Palette.Text, Enum.TextXAlignment.Left)
+        lbl.Position = UDim2.new(0, 0, 0, 0)
+        lbl.Size = UDim2.new(1, 0, 0, 14)
+        lbl.ZIndex = 7
+        track("Text", lbl, "TextColor3")
+    end
+
+    local box = Instance.new("TextBox")
+    box.Parent = holder
+    box.AnchorPoint = Vector2.new(0, 1)
+    box.Position = UDim2.new(0, 0, 1, 0)
+    box.Size = UDim2.new(1, 0, 0, 26)
+    box.BackgroundColor3 = Palette.Main
+    box.BackgroundTransparency = 0
+    box.BorderSizePixel = 0
+    box.FontFace = Fonts.Gotham
+    box.Text = default
+    box.PlaceholderText = placeholder
+    box.PlaceholderColor3 = Palette.TextDim
+    box.TextColor3 = Palette.Text
+    box.TextSize = 13
+    box.TextXAlignment = Enum.TextXAlignment.Center
+    box.TextYAlignment = Enum.TextYAlignment.Center
+    box.ClearTextOnFocus = false
+    box.ZIndex = 8
+    doubleStroke(box)
+    track("Main", box, "BackgroundColor3")
+    track("Text", box, "TextColor3")
+    track("TextDim", box, "PlaceholderColor3")
+
+    local nudge = Instance.new("UIPadding")
+    nudge.PaddingTop = UDim.new(0, 2)
+    nudge.Parent = box
+
+    box.FocusLost:Connect(function()
+        cb(box.Text)
+    end)
+
+    local api = {
+        Get = function() return box.Text end,
+        Set = function(v) box.Text = tostring(v) end,
+    }
+    if flag then registerConfigElement(flag, api.Get, api.Set, "textbox") end
+    return api
+end
+
+local function makeListbox(body, data)
+    local items = data.Items or {}
+    local default = data.Default
+    local cb = data.Callback or function() end
+    local flag = data.Flag
+    local size = data.Size or 120
+    local selected = default
+
+    local box = Instance.new("Frame")
+    box.Parent = body
+    box.BackgroundColor3 = Palette.Main
+    box.BackgroundTransparency = 0
+    box.BorderSizePixel = 0
+    box.Size = UDim2.new(1, 0, 0, size)
+    box.ZIndex = 6
+    box.LayoutOrder = #body:GetChildren()
+    doubleStroke(box)
+    track("Main", box, "BackgroundColor3")
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Parent = box
+    scroll.BackgroundTransparency = 1
+    scroll.BorderSizePixel = 0
+    scroll.Position = UDim2.new(0, 4, 0, 4)
+    scroll.Size = UDim2.new(1, -8, 1, -8)
+    scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    scroll.ScrollBarThickness = 3
+    scroll.ScrollBarImageColor3 = Palette.Accent
+    scroll.ScrollBarImageTransparency = 0.3
+    scroll.ZIndex = 7
+    scroll.Active = true
+    track("Accent", scroll, "ScrollBarImageColor3")
+
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = scroll
+    layout.Padding = UDim.new(0, 3)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local rows = {}
+    local function refresh(newItems, newSelected)
+        if newItems then items = newItems end
+        if newSelected ~= nil then selected = newSelected end
+        for _, r in pairs(rows) do r:Destroy() end
+        rows = {}
+        for i, item in ipairs(items) do
+            local itemName = tostring(item)
+            local b = Instance.new("TextButton")
+            b.Parent = scroll
+            b.Size = UDim2.new(1, 0, 0, 24)
+            b.BackgroundColor3 = Palette.Main
+            b.BackgroundTransparency = 0
+            b.BorderSizePixel = 0
+            b.Text = ""
+            b.AutoButtonColor = false
+            b.LayoutOrder = i
+            b.Name = itemName
+            b.ZIndex = 8
+            b.Active = true
+            b.Interactable = true
+            track("Main", b, "BackgroundColor3")
+            local t = label(b, itemName, 13, Palette.Text, Enum.TextXAlignment.Center)
+            t.Size = UDim2.new(1, 0, 1, 0)
+            t.ZIndex = 9
+            t.Name = "RowText"
+            if itemName == selected then
+                t.TextColor3 = Palette.Accent
+                track("Accent", t, "TextColor3")
+            else
+                track("Text", t, "TextColor3")
+            end
+            b.MouseButton1Click:Connect(function()
+                selected = itemName
+                for _, row in pairs(rows) do
+                    local rt = row:FindFirstChild("RowText")
+                    if rt then
+                        untrack(rt)
+                        if row.Name == itemName then
+                            rt.TextColor3 = Palette.Accent
+                            track("Accent", rt, "TextColor3")
+                        else
+                            rt.TextColor3 = Palette.Text
+                            track("Text", rt, "TextColor3")
+                        end
+                    end
+                end
+                cb(itemName)
+            end)
+            table.insert(rows, b)
+        end
+    end
+    refresh()
+
+    local api = {
+        Get = function() return selected end,
+        Set = function(v) refresh(nil, tostring(v)) end,
+        Refresh = function(list, sel) refresh(list, sel) end,
+    }
+    if flag then registerConfigElement(flag, api.Get, api.Set, "listbox") end
+    return api
+end
+
 -- ============================================================
 -- SECTION / TAB / WINDOW
 -- ============================================================
@@ -1376,6 +1573,9 @@ function Section:Dropdown(data) return makeDropdown(self.Body, data) end
 function Section:Colorpicker(data) return makeColorpicker(self.Body, data) end
 function Section:ColorPicker(data) return makeColorpicker(self.Body, data) end
 function Section:Label(data) return makeLabel(self.Body, data) end
+function Section:Button(data) return makeButton(self.Body, data) end
+function Section:Textbox(data) return makeTextbox(self.Body, data) end
+function Section:Listbox(data) return makeListbox(self.Body, data) end
 
 local Tab = {}
 Tab.__index = Tab
@@ -1457,27 +1657,50 @@ Window.__index = Window
 
 function Window:Tab(data)
     local name = data.Name or "Tab"
+    local myIndex = #self.Tabs + 1
+
     local tab = Instance.new("TextButton")
     tab.Parent = self.Title
     tab.BackgroundTransparency = 1
     tab.BorderSizePixel = 0
     tab.AnchorPoint = Vector2.new(1, 0.5)
-    local index = #self.Tabs + 1
-    local offsetFromRight = TAB_RIGHT + (1 - index) * (TAB_W + TAB_GAP)
-    tab.Position = UDim2.new(1, -offsetFromRight, 0.5, 0)
-    tab.Size = UDim2.new(0, TAB_W, 0, BAR_H - 8)
+    tab.AutomaticSize = Enum.AutomaticSize.X
+    tab.Size = UDim2.new(0, 0, 0, BAR_H - 8)
+    tab.Position = UDim2.new(1, 0, 0.5, 0)
     tab.FontFace = Fonts.Gotham
     tab.Text = name
-    tab.TextColor3 = index == 1 and Palette.Text or Palette.TextDim
+    tab.TextColor3 = (myIndex == 1) and Palette.Text or Palette.TextDim
     tab.TextSize = 14
-    tab.TextXAlignment = Enum.TextXAlignment.Right
+    tab.TextXAlignment = Enum.TextXAlignment.Center
     tab.TextYAlignment = Enum.TextYAlignment.Center
     tab.AutoButtonColor = false
     tab.ZIndex = 20
     tab.Active = true
     tab.Interactable = true
-    track(index == 1 and "Text" or "TextDim", tab, "TextColor3")
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 6)
+    pad.PaddingRight = UDim.new(0, 6)
+    pad.Parent = tab
+
+    track((myIndex == 1) and "Text" or "TextDim", tab, "TextColor3")
     table.insert(self.TabButtons, tab)
+
+    local function repositionTabs()
+        local cursor = -TAB_RIGHT
+        for i = #self.TabButtons, 1, -1 do
+            local t = self.TabButtons[i]
+            local w = t.AbsoluteSize.X
+            if not w or w <= 0 then w = TAB_W end
+            cursor = cursor - w
+            t.Position = UDim2.new(1, cursor, 0.5, 0)
+            cursor = cursor - TAB_GAP
+        end
+    end
+    task.defer(repositionTabs)
+    task.delay(0.15, repositionTabs)
+    tab:GetPropertyChangedSignal("AbsoluteSize"):Connect(repositionTabs)
+
     local page = Instance.new("ScrollingFrame")
     page.Parent = self.Content
     page.BackgroundTransparency = 1
@@ -1485,7 +1708,7 @@ function Window:Tab(data)
     page.Position = UDim2.new(0, 0, 0, 0)
     page.Size = UDim2.new(1, 0, 1, 0)
     page.ZIndex = 3
-    page.Visible = (index == 1)
+    page.Visible = (myIndex == 1)
     page.CanvasSize = UDim2.new(0, 0, 0, 0)
     page.AutomaticCanvasSize = Enum.AutomaticSize.Y
     page.ScrollBarThickness = 3
@@ -1495,15 +1718,17 @@ function Window:Tab(data)
     page.ClipsDescendants = true
     track("Accent", page, "ScrollBarImageColor3")
     table.insert(self.Pages, page)
+
     tab.MouseButton1Click:Connect(function()
-        for j = 1, #self.Tabs do
-            local on = (j == index)
+        for j = 1, #self.TabButtons do
+            local on = (j == myIndex)
             untrack(self.TabButtons[j])
             track(on and "Text" or "TextDim", self.TabButtons[j], "TextColor3")
             self.TabButtons[j].TextColor3 = on and Palette.Text or Palette.TextDim
             self.Pages[j].Visible = on
         end
     end)
+
     table.insert(self.Tabs, name)
     local self2 = setmetatable({ Page = page, Window = self }, Tab)
     return self2
@@ -1515,6 +1740,8 @@ Library.__index = Library
 function Library:Window(data)
     local windowName = data.Name or "Howl"
     local windowSize = data.Size or UDim2.new(0, WINDOW_W, 0, WINDOW_H)
+    local withSettings = true
+    if data.Settings ~= nil then withSettings = data.Settings end
 
     local Menu = Instance.new("ScreenGui")
     Menu.Name = "menu"
@@ -1709,8 +1936,82 @@ function Library:Window(data)
         LoadConfig = loadConfigFile,
         DeleteConfig = deleteConfigFile,
         ListConfigs = listConfigs,
-        SetMenuKey = function(k) end,
     }, Window)
+
+    if withSettings then
+        local SettingsTab = self:Tab({ Name = "Settings" })
+        local ConfigSection = SettingsTab:Section({ Name = "Config", Side = 0 })
+        local ThemeSection  = SettingsTab:Section({ Name = "Theme",  Side = 1 })
+
+        local nameState = ""
+        local selectedConfig = nil
+        local configList
+
+        ConfigSection:Textbox({
+            Name = "Name",
+            Placeholder = "config name…",
+            Callback = function(v) nameState = v end,
+        })
+
+        configList = ConfigSection:Listbox({
+            Items = listConfigs(),
+            Size = 140,
+            Callback = function(v) selectedConfig = v end,
+        })
+
+        ConfigSection:Button({
+            Name = "Create",
+            Callback = function()
+                if nameState == "" then return end
+                saveConfigFile(nameState)
+                selectedConfig = nameState
+                configList.Refresh(listConfigs(), nameState)
+            end,
+        })
+        ConfigSection:Button({
+            Name = "Save",
+            Callback = function()
+                if not selectedConfig then return end
+                saveConfigFile(selectedConfig)
+            end,
+        })
+        ConfigSection:Button({
+            Name = "Load",
+            Callback = function()
+                if not selectedConfig then return end
+                loadConfigFile(selectedConfig)
+            end,
+        })
+        ConfigSection:Button({
+            Name = "Delete",
+            Callback = function()
+                if not selectedConfig then return end
+                deleteConfigFile(selectedConfig)
+                selectedConfig = nil
+                configList.Refresh(listConfigs())
+            end,
+        })
+
+        local themes = {
+            { "Accent",     "Accent"  },
+            { "Background", "Main"    },
+            { "Inline",     "Inline"  },
+            { "Outline",    "Outline" },
+            { "Text",       "Text"    },
+            { "Text Dim",   "TextDim" },
+        }
+        for _, pair in ipairs(themes) do
+            local displayName, role = pair[1], pair[2]
+            ThemeSection:Colorpicker({
+                Name = displayName,
+                Default = Palette[role],
+                Callback = function(c)
+                    applyRole(role, c)
+                end,
+            })
+        end
+    end
+
     return self
 end
 
