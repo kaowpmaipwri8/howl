@@ -274,18 +274,21 @@ local function collectFadeTargets()
     if not fadeHome then return end
     fadeCache = {}
     for _, d in ipairs(fadeHome:GetDescendants()) do
-        if d:IsA("Frame") or d:IsA("TextButton") or d:IsA("TextBox")
-           or d:IsA("ScrollingFrame") then
-            table.insert(fadeCache, { obj = d, prop = "BackgroundTransparency" })
-        end
-        if d:IsA("TextButton") or d:IsA("TextBox") or d:IsA("TextLabel") then
-            table.insert(fadeCache, { obj = d, prop = "TextTransparency" })
-        end
-        if d:IsA("ImageLabel") then
-            table.insert(fadeCache, { obj = d, prop = "ImageTransparency" })
-        end
-        if d:IsA("UIStroke") then
-            table.insert(fadeCache, { obj = d, prop = "Transparency" })
+        -- Skip floating popups/lists that manage their own visibility
+        if not d:GetAttribute("NoFade") then
+            if d:IsA("Frame") or d:IsA("TextButton") or d:IsA("TextBox")
+               or d:IsA("ScrollingFrame") then
+                table.insert(fadeCache, { obj = d, prop = "BackgroundTransparency" })
+            end
+            if d:IsA("TextButton") or d:IsA("TextBox") or d:IsA("TextLabel") then
+                table.insert(fadeCache, { obj = d, prop = "TextTransparency" })
+            end
+            if d:IsA("ImageLabel") then
+                table.insert(fadeCache, { obj = d, prop = "ImageTransparency" })
+            end
+            if d:IsA("UIStroke") then
+                table.insert(fadeCache, { obj = d, prop = "Transparency" })
+            end
         end
     end
 end
@@ -312,18 +315,20 @@ end
 local function forceHideAll()
     if not fadeHome then return end
     for _, d in ipairs(fadeHome:GetDescendants()) do
-        if d:IsA("Frame") or d:IsA("TextButton") or d:IsA("TextBox")
-           or d:IsA("ScrollingFrame") then
-            pcall(function() d.BackgroundTransparency = 1 end)
-        end
-        if d:IsA("TextButton") or d:IsA("TextBox") or d:IsA("TextLabel") then
-            pcall(function() d.TextTransparency = 1 end)
-        end
-        if d:IsA("ImageLabel") then
-            pcall(function() d.ImageTransparency = 1 end)
-        end
-        if d:IsA("UIStroke") then
-            pcall(function() d.Transparency = 1 end)
+        if not d:GetAttribute("NoFade") then
+            if d:IsA("Frame") or d:IsA("TextButton") or d:IsA("TextBox")
+               or d:IsA("ScrollingFrame") then
+                pcall(function() d.BackgroundTransparency = 1 end)
+            end
+            if d:IsA("TextButton") or d:IsA("TextBox") or d:IsA("TextLabel") then
+                pcall(function() d.TextTransparency = 1 end)
+            end
+            if d:IsA("ImageLabel") then
+                pcall(function() d.ImageTransparency = 1 end)
+            end
+            if d:IsA("UIStroke") then
+                pcall(function() d.Transparency = 1 end)
+            end
         end
     end
 end
@@ -837,6 +842,7 @@ local function makeDropdown(body, data)
     chevron.Interactable = false
     local list = Instance.new("Frame")
     list.Parent = fadeHome
+    list:SetAttribute("NoFade", true)
     list.BackgroundColor3 = Palette.Main
     list.BackgroundTransparency = 0
     list.BorderSizePixel = 0
@@ -924,7 +930,9 @@ local function makeDropdown(body, data)
         end)
         btn.MouseButton1Click:Connect(function()
             selectOption(optName)
-            lastToggle = os.clock() + 0.25
+            -- Cool-down so the field's own click handler (which fires after
+            -- this one on the same input frame) doesn't immediately re-open.
+            lastToggle = os.clock() + 0.2
             dd:setOpen(false)
         end)
         optionButtons[tostring(optName)] = { btn = btn, label = optText }
@@ -1009,7 +1017,7 @@ local function makeDropdown(body, data)
     end
     field.MouseButton1Click:Connect(function()
         local now = os.clock()
-        if now - lastToggle < 0.15 then return end
+        if now < lastToggle then return end  -- still in cooldown after a selection
         lastToggle = now
         dd:setOpen(not dd.opened)
     end)
@@ -1067,6 +1075,7 @@ local function makeColorpicker(body, data)
     local PANEL_H = SV_PAD + svSize + GAP_V + HUE_H + HEX_GAP + HEX_H + SV_PAD
     local popup = Instance.new("Frame")
     popup.Parent = fadeHome
+    popup:SetAttribute("NoFade", true)
     popup.BackgroundColor3 = Palette.Main
     popup.BackgroundTransparency = 0
     popup.BorderSizePixel = 0
@@ -1781,9 +1790,14 @@ function Library:Window(data)
 
     fadeHome = Home
     local menuOpen = true
+
     local function setHomeVisible(v)
+        menuOpen = v
         if v then
             Home.Visible = true
+            -- Rebuild fade cache so newly-created elements are included.
+            collectFadeTargets()
+            snapshotBases()
             forceHideAll()
             fadeState = 0
             fadeTo(1, 0.32, Enum.EasingStyle.Quart, false)
@@ -1792,8 +1806,7 @@ function Library:Window(data)
         end
     end
     local function toggleMenu()
-        menuOpen = not menuOpen
-        setHomeVisible(menuOpen)
+        setHomeVisible(not menuOpen)
     end
 
     local Title = Instance.new("Frame")
@@ -2204,6 +2217,12 @@ function Library:Window(data)
             })
         end
     end
+
+    -- Initialize fade cache AFTER all UI is built.
+    collectFadeTargets()
+    snapshotBases()
+    fadeState = 1
+    applyFade(1)
 
     return self
 end
