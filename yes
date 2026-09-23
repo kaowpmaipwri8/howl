@@ -865,6 +865,25 @@ local function makeDropdown(body, data)
         lastToggle = now
         dd:setOpen(not dd.opened)
     end)
+
+    -- Close the dropdown if the user clicks anywhere outside the field or list.
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        if not dd.opened then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1
+            and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local pos = input.Position
+        local function inside(g)
+            if not g or not g.Parent then return false end
+            local a, sz = g.AbsolutePosition, g.AbsoluteSize
+            return pos.X >= a.X and pos.X <= a.X + sz.X
+               and pos.Y >= a.Y and pos.Y <= a.Y + sz.Y
+        end
+        if not (inside(field) or inside(list)) then
+            dd:setOpen(false)
+        end
+    end)
+
     local api = {
         Set = function(v) selectOption(v) end,
         Get = function() return value end,
@@ -1296,7 +1315,7 @@ local function makeTextbox(body, data)
     track("TextDim", box, "PlaceholderColor3")
 
     local nudge = Instance.new("UIPadding")
-    nudge.PaddingTop = UDim.new(0, 2)
+    nudge.PaddingTop = UDim.new(0, TEXT_Y_NUDGE)
     nudge.Parent = box
 
     box.FocusLost:Connect(function()
@@ -1968,13 +1987,14 @@ function Library:Window(data)
         presetRow.Parent = ThemeSection.Body
         presetRow.BackgroundTransparency = 1
         presetRow.BorderSizePixel = 0
-        presetRow.Size = UDim2.new(1, 0, 0, 24)
+        presetRow.Size = UDim2.new(1, 0, 0, 40)
         presetRow.ZIndex = 6
         presetRow.LayoutOrder = #ThemeSection.Body:GetChildren()
 
         local presetLbl = label(presetRow, "Themes:", 14, Palette.Text, Enum.TextXAlignment.Left)
-        presetLbl.Position = UDim2.new(0, 0, 0, 0)
-        presetLbl.Size = UDim2.new(0, 60, 1, 0)
+        presetLbl.Position = UDim2.new(0, 0, 0.5, 0)
+        presetLbl.AnchorPoint = Vector2.new(0, 0.5)
+        presetLbl.Size = UDim2.new(0.28, 0, 0, 22)
         presetLbl.ZIndex = 7
         track("Text", presetLbl, "TextColor3")
 
@@ -2028,7 +2048,7 @@ function Library:Window(data)
             if field then
                 field.AnchorPoint = Vector2.new(1, 0.5)
                 field.Position = UDim2.new(1, 0, 0.5, 0)
-                field.Size = UDim2.new(0.72, 0, 0, 22)
+                field.Size = UDim2.new(0.68, 0, 0, 22)
                 field.Parent = presetRow
             end
             r:Destroy()
