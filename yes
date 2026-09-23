@@ -1016,6 +1016,7 @@ local function makeDropdown(body, data)
     local api = {
         Set = function(v) selectOption(v) end,
         Get = function() return value end,
+        Row = row,
     }
     if flag then registerConfigElement(flag, api.Get, api.Set, "dropdown") end
     return api
@@ -1938,59 +1939,251 @@ function Library:Window(data)
         ListConfigs = listConfigs,
     }, Window)
 
+    -- ============================================================
+    -- MENU KEYBIND
+    -- ============================================================
+    local menuKey = Enum.KeyCode.RightShift
+    local keyPicking = false
+
+    UserInputService.InputBegan:Connect(function(input, gp)
+        if gp then return end
+        if keyPicking then return end
+        if input.KeyCode == menuKey then
+            toggleMenu()
+        end
+    end)
+
     if withSettings then
         local SettingsTab = self:Tab({ Name = "Settings" })
         local ConfigSection = SettingsTab:Section({ Name = "Config", Side = 0 })
         local ThemeSection  = SettingsTab:Section({ Name = "Theme",  Side = 1 })
 
+        -- ========================================================
+        -- CONFIG SECTION
+        -- ========================================================
         local nameState = ""
         local selectedConfig = nil
         local configList
 
+        configList = ConfigSection:Listbox({
+            Items = listConfigs(),
+            Size = 120,
+            Callback = function(v) selectedConfig = v end,
+        })
+
         ConfigSection:Textbox({
-            Name = "Name",
+            Name = "",
             Placeholder = "config name…",
             Callback = function(v) nameState = v end,
         })
 
-        configList = ConfigSection:Listbox({
-            Items = listConfigs(),
-            Size = 140,
-            Callback = function(v) selectedConfig = v end,
+        local btnRow = Instance.new("Frame")
+        btnRow.Parent = ConfigSection.Body
+        btnRow.BackgroundTransparency = 1
+        btnRow.BorderSizePixel = 0
+        btnRow.Size = UDim2.new(1, 0, 0, 24)
+        btnRow.ZIndex = 6
+        btnRow.LayoutOrder = #ConfigSection.Body:GetChildren()
+        local btnLayout = Instance.new("UIListLayout")
+        btnLayout.Parent = btnRow
+        btnLayout.FillDirection = Enum.FillDirection.Horizontal
+        btnLayout.Padding = UDim.new(0, 4)
+        btnLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        btnLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+        btnLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+
+        local function makeSmallButton(text, onClick)
+            local b = Instance.new("TextButton")
+            b.Parent = btnRow
+            b.Size = UDim2.new(0.25, -3, 1, 0)
+            b.BackgroundColor3 = Palette.Main
+            b.BackgroundTransparency = 0
+            b.BorderSizePixel = 0
+            b.Text = ""
+            b.AutoButtonColor = false
+            b.LayoutOrder = #btnRow:GetChildren()
+            b.ZIndex = 7
+            b.Active = true
+            b.Interactable = true
+            doubleStroke(b)
+            track("Main", b, "BackgroundColor3")
+            local t = label(b, text, 12, Palette.Text, Enum.TextXAlignment.Center)
+            t.Size = UDim2.new(1, 0, 1, 0)
+            t.ZIndex = 8
+            track("Text", t, "TextColor3")
+            b.MouseEnter:Connect(function() b.BackgroundColor3 = Palette.Inline end)
+            b.MouseLeave:Connect(function() b.BackgroundColor3 = Palette.Main end)
+            b.MouseButton1Click:Connect(onClick)
+            return b
+        end
+
+        makeSmallButton("Create", function()
+            if nameState == "" then return end
+            saveConfigFile(nameState)
+            selectedConfig = nameState
+            configList.Refresh(listConfigs(), nameState)
+        end)
+        makeSmallButton("Save", function()
+            if not selectedConfig then return end
+            saveConfigFile(selectedConfig)
+        end)
+        makeSmallButton("Load", function()
+            if not selectedConfig then return end
+            loadConfigFile(selectedConfig)
+        end)
+        makeSmallButton("Delete", function()
+            if not selectedConfig then return end
+            deleteConfigFile(selectedConfig)
+            selectedConfig = nil
+            configList.Refresh(listConfigs())
+        end)
+
+        -- MENU KEYBIND ROW
+        local menuRow = Instance.new("Frame")
+        menuRow.Parent = ConfigSection.Body
+        menuRow.BackgroundTransparency = 1
+        menuRow.BorderSizePixel = 0
+        menuRow.Size = UDim2.new(1, 0, 0, ROW_H)
+        menuRow.ZIndex = 6
+        menuRow.LayoutOrder = #ConfigSection.Body:GetChildren()
+
+        local menuLbl = label(menuRow, "Menu:", 14, Palette.Text, Enum.TextXAlignment.Left)
+        menuLbl.Position = UDim2.new(0, 0, 0, 0)
+        menuLbl.Size = UDim2.new(0.5, 0, 1, 0)
+        menuLbl.ZIndex = 7
+        track("Text", menuLbl, "TextColor3")
+
+        local menuKeyBox = Instance.new("TextButton")
+        menuKeyBox.Parent = menuRow
+        menuKeyBox.AnchorPoint = Vector2.new(1, 0.5)
+        menuKeyBox.Position = UDim2.new(1, 0, 0.5, 0)
+        menuKeyBox.Size = UDim2.new(0, FIELD_W, 0, FIELD_H)
+        menuKeyBox.BackgroundTransparency = 1
+        menuKeyBox.BorderSizePixel = 0
+        menuKeyBox.Text = ""
+        menuKeyBox.AutoButtonColor = false
+        menuKeyBox.ZIndex = 100
+        menuKeyBox.Active = true
+        menuKeyBox.Interactable = true
+
+        local menuKeyText = Instance.new("TextLabel")
+        menuKeyText.Parent = menuKeyBox
+        menuKeyText.BackgroundTransparency = 1
+        menuKeyText.BorderSizePixel = 0
+        menuKeyText.FontFace = Fonts.Gotham
+        menuKeyText.Text = menuKey.Name
+        menuKeyText.TextColor3 = Palette.TextDim
+        menuKeyText.TextSize = 10
+        menuKeyText.TextXAlignment = Enum.TextXAlignment.Right
+        menuKeyText.TextYAlignment = Enum.TextYAlignment.Center
+        menuKeyText.AnchorPoint = Vector2.new(1, 0.5)
+        menuKeyText.Position = UDim2.new(1, 0, 0.5, 0)
+        menuKeyText.Size = UDim2.new(1, 0, 1, 0)
+        menuKeyText.ZIndex = 101
+        menuKeyText.Active = false
+        menuKeyText.Interactable = false
+        track("TextDim", menuKeyText, "TextColor3")
+
+        menuKeyBox.MouseButton1Click:Connect(function()
+            if keyPicking then return end
+            keyPicking = true
+            menuKeyText.Text = "..."
+            menuKeyText.TextColor3 = Palette.Accent
+            local conn
+            conn = UserInputService.InputBegan:Connect(function(input, gp)
+                if gp then return end
+                if input.UserInputType == Enum.UserInputType.Keyboard then
+                    menuKey = input.KeyCode
+                elseif input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    menuKey = Enum.UserInputType.MouseButton1
+                elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+                    menuKey = Enum.UserInputType.MouseButton2
+                else
+                    return
+                end
+                keyPicking = false
+                menuKeyText.Text = menuKey.Name
+                menuKeyText.TextColor3 = Palette.TextDim
+                conn:Disconnect()
+            end)
+        end)
+
+        -- ========================================================
+        -- THEME SECTION
+        -- ========================================================
+        -- Preset themes row
+        local presetRow = Instance.new("Frame")
+        presetRow.Parent = ThemeSection.Body
+        presetRow.BackgroundTransparency = 1
+        presetRow.BorderSizePixel = 0
+        presetRow.Size = UDim2.new(1, 0, 0, 24)
+        presetRow.ZIndex = 6
+        presetRow.LayoutOrder = #ThemeSection.Body:GetChildren()
+
+        local presetLbl = label(presetRow, "Themes:", 14, Palette.Text, Enum.TextXAlignment.Left)
+        presetLbl.Position = UDim2.new(0, 0, 0, 0)
+        presetLbl.Size = UDim2.new(0, 60, 1, 0)
+        presetLbl.ZIndex = 7
+        track("Text", presetLbl, "TextColor3")
+
+        -- We build the preset dropdown manually to control its position
+        -- (label left, dropdown right)
+        local presetDropdown = ThemeSection:Dropdown({
+            Name = "",
+            Items = { "Default", "Cherry", "Galaxy", "Red", "Sakura" },
+            Default = "Default",
+            Callback = function(v)
+                if v == "Default" then
+                    applyRole("Main",    Color3.fromRGB(0x19, 0x19, 0x19))
+                    applyRole("Inline",  Color3.fromRGB(0x4B, 0x4B, 0x4B))
+                    applyRole("Outline", Color3.fromRGB(0x00, 0x00, 0x00))
+                    applyRole("Accent",  Color3.fromRGB(0xFF, 0xE2, 0x03))
+                    applyRole("Text",    Color3.fromRGB(0xFF, 0xFF, 0xFF))
+                    applyRole("TextDim", Color3.fromRGB(0x56, 0x56, 0x56))
+                elseif v == "Cherry" then
+                    applyRole("Main",    Color3.fromRGB(0x1A, 0x0A, 0x0F))
+                    applyRole("Inline",  Color3.fromRGB(0x6B, 0x1F, 0x2E))
+                    applyRole("Outline", Color3.fromRGB(0x00, 0x00, 0x00))
+                    applyRole("Accent",  Color3.fromRGB(0xFF, 0x4F, 0x6A))
+                    applyRole("Text",    Color3.fromRGB(0xFF, 0xFF, 0xFF))
+                    applyRole("TextDim", Color3.fromRGB(0xB5, 0x6A, 0x7A))
+                elseif v == "Galaxy" then
+                    applyRole("Main",    Color3.fromRGB(0x0B, 0x0A, 0x1A))
+                    applyRole("Inline",  Color3.fromRGB(0x2A, 0x25, 0x55))
+                    applyRole("Outline", Color3.fromRGB(0x00, 0x00, 0x00))
+                    applyRole("Accent",  Color3.fromRGB(0x9C, 0x7B, 0xFF))
+                    applyRole("Text",    Color3.fromRGB(0xFF, 0xFF, 0xFF))
+                    applyRole("TextDim", Color3.fromRGB(0x7A, 0x72, 0xB5))
+                elseif v == "Red" then
+                    applyRole("Main",    Color3.fromRGB(0x1A, 0x0A, 0x0A))
+                    applyRole("Inline",  Color3.fromRGB(0x5A, 0x12, 0x12))
+                    applyRole("Outline", Color3.fromRGB(0x00, 0x00, 0x00))
+                    applyRole("Accent",  Color3.fromRGB(0xFF, 0x2C, 0x2C))
+                    applyRole("Text",    Color3.fromRGB(0xFF, 0xFF, 0xFF))
+                    applyRole("TextDim", Color3.fromRGB(0xB5, 0x66, 0x66))
+                elseif v == "Sakura" then
+                    applyRole("Main",    Color3.fromRGB(0x1F, 0x14, 0x1A))
+                    applyRole("Inline",  Color3.fromRGB(0x8A, 0x4A, 0x6B))
+                    applyRole("Outline", Color3.fromRGB(0x00, 0x00, 0x00))
+                    applyRole("Accent",  Color3.fromRGB(0xFF, 0xB7, 0xD5))
+                    applyRole("Text",    Color3.fromRGB(0xFF, 0xFF, 0xFF))
+                    applyRole("TextDim", Color3.fromRGB(0xC9, 0x9E, 0xB5))
+                end
+            end,
         })
 
-        ConfigSection:Button({
-            Name = "Create",
-            Callback = function()
-                if nameState == "" then return end
-                saveConfigFile(nameState)
-                selectedConfig = nameState
-                configList.Refresh(listConfigs(), nameState)
-            end,
-        })
-        ConfigSection:Button({
-            Name = "Save",
-            Callback = function()
-                if not selectedConfig then return end
-                saveConfigFile(selectedConfig)
-            end,
-        })
-        ConfigSection:Button({
-            Name = "Load",
-            Callback = function()
-                if not selectedConfig then return end
-                loadConfigFile(selectedConfig)
-            end,
-        })
-        ConfigSection:Button({
-            Name = "Delete",
-            Callback = function()
-                if not selectedConfig then return end
-                deleteConfigFile(selectedConfig)
-                selectedConfig = nil
-                configList.Refresh(listConfigs())
-            end,
-        })
+        -- Move the dropdown's row into presetRow and shrink it
+        if presetDropdown and presetDropdown.Row then
+            local r = presetDropdown.Row
+            local field = r:FindFirstChildOfClass("TextButton")
+            if field then
+                field.AnchorPoint = Vector2.new(1, 0.5)
+                field.Position = UDim2.new(1, 0, 0.5, 0)
+                field.Size = UDim2.new(0.72, 0, 0, 22)
+                field.Parent = presetRow
+            end
+            r:Destroy()
+        end
 
         local themes = {
             { "Accent",     "Accent"  },
