@@ -1667,14 +1667,14 @@ function Library:Window(data)
     TitleLine.Interactable = false
     track("Inline", TitleLine, "BackgroundColor3")
 
-    -- Container for tab buttons, right-aligned via UIListLayout
+    -- Container for tab buttons, left-aligned in creation order
     local TabsContainer = Instance.new("Frame")
     TabsContainer.Name = "TabsContainer"
     TabsContainer.Parent = Title
     TabsContainer.BackgroundTransparency = 1
     TabsContainer.BorderSizePixel = 0
-    TabsContainer.AnchorPoint = Vector2.new(1, 0.5)
-    TabsContainer.Position = UDim2.new(1, -TAB_RIGHT, 0.5, 0)
+    TabsContainer.AnchorPoint = Vector2.new(0, 0.5)
+    TabsContainer.Position = UDim2.new(0, 70, 0.5, 0)
     TabsContainer.Size = UDim2.new(0, 0, 1, 0)
     TabsContainer.AutomaticSize = Enum.AutomaticSize.X
     TabsContainer.ZIndex = 19
@@ -1683,7 +1683,7 @@ function Library:Window(data)
 
     local tabsLayout = Instance.new("UIListLayout")
     tabsLayout.FillDirection = Enum.FillDirection.Horizontal
-    tabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    tabsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
     tabsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
     tabsLayout.SortOrder = Enum.SortOrder.LayoutOrder
     tabsLayout.Padding = UDim.new(0, TAB_GAP)
@@ -1744,7 +1744,7 @@ function Library:Window(data)
     dragArea.Modal = false
     dragArea.Size = UDim2.new(1, 0, 1, 0)
     dragArea.Position = UDim2.new(0, 0, 0, 0)
-    dragArea.ZIndex = 5
+    dragArea.ZIndex = 4
     dragArea.Active = true
     dragArea.Interactable = true
 
