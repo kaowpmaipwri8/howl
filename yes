@@ -262,119 +262,17 @@ local function applyRole(role, c)
     end
 end
 
--- ============================================================
--- FADE SYSTEM
--- ============================================================
-local fadeCache = nil
-local fadeConn = nil
-local fadeState = 1
-local fadeHome = nil
-
-local function collectFadeTargets()
-    if not fadeHome then return end
-    fadeCache = {}
-    for _, d in ipairs(fadeHome:GetDescendants()) do
-        -- Skip floating popups/lists that manage their own visibility
-        if not d:GetAttribute("NoFade") then
-            if d:IsA("Frame") or d:IsA("TextButton") or d:IsA("TextBox")
-               or d:IsA("ScrollingFrame") then
-                table.insert(fadeCache, { obj = d, prop = "BackgroundTransparency" })
-            end
-            if d:IsA("TextButton") or d:IsA("TextBox") or d:IsA("TextLabel") then
-                table.insert(fadeCache, { obj = d, prop = "TextTransparency" })
-            end
-            if d:IsA("ImageLabel") then
-                table.insert(fadeCache, { obj = d, prop = "ImageTransparency" })
-            end
-            if d:IsA("UIStroke") then
-                table.insert(fadeCache, { obj = d, prop = "Transparency" })
-            end
-        end
+local function setHomeVisible(v)
+    menuOpen = v
+    if v then
+        Home.Visible = true
+        collectFadeTargets()   -- rebuild list, but preserve existing bases
+        forceHideAll()
+        fadeState = 0
+        fadeTo(1, 0.32, Enum.EasingStyle.Quart, false)
+    else
+        fadeTo(0, 0.32, Enum.EasingStyle.Quart, true)
     end
-end
-
-local function snapshotBases()
-    if not fadeCache then return end
-    for _, t in ipairs(fadeCache) do
-        t.base = t.obj[t.prop]
-    end
-end
-
-local function applyFade(alpha)
-    if not fadeCache then return end
-    for _, t in ipairs(fadeCache) do
-        if t.obj and t.obj.Parent then
-            local base = t.base or 0
-            local v = 1 - (1 - base) * alpha
-            if v < 0 then v = 0 elseif v > 1 then v = 1 end
-            pcall(function() t.obj[t.prop] = v end)
-        end
-    end
-end
-
-local function forceHideAll()
-    if not fadeHome then return end
-    for _, d in ipairs(fadeHome:GetDescendants()) do
-        if not d:GetAttribute("NoFade") then
-            if d:IsA("Frame") or d:IsA("TextButton") or d:IsA("TextBox")
-               or d:IsA("ScrollingFrame") then
-                pcall(function() d.BackgroundTransparency = 1 end)
-            end
-            if d:IsA("TextButton") or d:IsA("TextBox") or d:IsA("TextLabel") then
-                pcall(function() d.TextTransparency = 1 end)
-            end
-            if d:IsA("ImageLabel") then
-                pcall(function() d.ImageTransparency = 1 end)
-            end
-            if d:IsA("UIStroke") then
-                pcall(function() d.Transparency = 1 end)
-            end
-        end
-    end
-end
-
-local function fadeTo(target, duration, style, hideWhenDone)
-    if not fadeHome then return end
-    if fadeConn then fadeConn:Disconnect() fadeConn = nil end
-    local startA = fadeState
-    local t0 = os.clock()
-    if duration <= 0 then
-        fadeState = target
-        if target <= 0 then
-            forceHideAll()
-            if hideWhenDone then fadeHome.Visible = false end
-        else
-            applyFade(target)
-        end
-        return
-    end
-    fadeConn = RunService.RenderStepped:Connect(function()
-        local a = math.clamp((os.clock() - t0) / duration, 0, 1)
-        if style == Enum.EasingStyle.Cubic then
-            a = 1 - (1 - a) ^ 3
-        elseif style == Enum.EasingStyle.Quart then
-            a = 1 - (1 - a) ^ 4
-        elseif style == Enum.EasingStyle.Sine then
-            a = math.sin(a * math.pi / 2)
-        else
-            a = 1 - (1 - a) * (1 - a)
-        end
-        fadeState = startA + (target - startA) * a
-        applyFade(fadeState)
-        if a >= 1 then
-            fadeState = target
-            if target <= 0 then
-                forceHideAll()
-            else
-                applyFade(target)
-            end
-            fadeConn:Disconnect()
-            fadeConn = nil
-            if hideWhenDone and target <= 0 then
-                fadeHome.Visible = false
-            end
-        end
-    end)
 end
 
 -- ============================================================
